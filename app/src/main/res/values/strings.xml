@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">UniLens</string>
+    <string name="app_description">Real-Time Phone &amp; Email OCR Scanner</string>
+    <string name="channel_name">UniLens Scanner Service</string>
+    <string name="channel_description">Notifications for UniLens background floating widget</string>
+    <string name="floating_service_running">UniLens Floating Bubble is active</string>
+    <string name="floating_service_desc">Tap bubble to launch scanner overlay</string>
+</resources>

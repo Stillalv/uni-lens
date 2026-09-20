@@ -1,0 +1,102 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew test --stacktrace
+
+      - name: Assemble Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Sign Release APK
+        id: sign_apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found in release directory!"
+            exit 1
+          fi
+
+          SIGNED_APK="UniLens-${{ github.ref_name }}.apk"
+
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Signing with repository secret keystore..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+            $ANDROID_HOME/build-tools/35.0.0/apksigner sign --ks release.keystore \
+              --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+              --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+              --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+              --out "$SIGNED_APK" "$APK_PATH"
+          else
+            echo "Signing with generated release key..."
+            keytool -genkeypair -v -keystore auto-release.keystore -alias unilens \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=UniLens, OU=Mobile, O=UniLens, L=Unknown, S=Unknown, C=US"
+            
+            $ANDROID_HOME/build-tools/35.0.0/apksigner sign --ks auto-release.keystore \
+              --ks-key-alias unilens \
+              --ks-pass pass:android \
+              --key-pass pass:android \
+              --out "$SIGNED_APK" "$APK_PATH"
+          fi
+
+          echo "APK signed: $SIGNED_APK"
+          SHA256_HASH=$(sha256sum "$SIGNED_APK" | awk '{print $1}')
+          echo "$SHA256_HASH  $SIGNED_APK" > "$SIGNED_APK.sha256"
+          echo "SHA256: $SHA256_HASH"
+          echo "sha256_hash=$SHA256_HASH" >> $GITHUB_OUTPUT
+          echo "apk_path=$SIGNED_APK" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            UniLens-${{ github.ref_name }}.apk
+            UniLens-${{ github.ref_name }}.apk.sha256
+          name: "UniLens ${{ github.ref_name }}"
+          body: |
+            ## UniLens ${{ github.ref_name }} Release
+            
+            Real-Time Floating Phone & Email OCR Scanner for Android.
+            
+            ### Integrity & Checksum
+            - **File**: `UniLens-${{ github.ref_name }}.apk`
+            - **SHA-256**: `${{ steps.sign_apk.outputs.sha256_hash }}`
+            
+            ### What's New
+            - Instant on-device Latin OCR detection via Google ML Kit
+            - Strict phone detection (+ required, E.164 normalized output)
+            - Strict email detection (`name@domain.extension`)
+            - Floating bubble overlay with decoupled camera lifecycle
+            - Auto update checker with SHA-256 verification
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

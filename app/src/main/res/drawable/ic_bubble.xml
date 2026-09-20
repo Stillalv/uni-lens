@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+    <path
+        android:fillColor="#1E1E1E"
+        android:pathData="M 28,0 A 28,28 0 1,1 27.9,0 Z" />
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M 28,4 A 24,24 0 1,1 27.9,4 Z" />
+    <!-- Scanner Eye -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M 28,20 A 8,8 0 1,1 27.9,20 Z" />
+    <!-- Pulse Line -->
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="2"
+        android:pathData="M 18,36 L 38,36" />
+</vector>
