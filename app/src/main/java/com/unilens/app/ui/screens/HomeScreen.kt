@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -32,6 +36,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -41,6 +46,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -50,13 +57,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.unilens.app.ui.components.ImageScanResultsDialog
 import com.unilens.app.ui.theme.EmeraldPrimary
+import com.unilens.app.ui.viewmodel.ScannerViewModel
 import com.unilens.app.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    scannerViewModel: ScannerViewModel,
     settingsViewModel: SettingsViewModel,
     isFloatingEnabled: Boolean,
     onStartScannerClick: () -> Unit,
@@ -65,6 +75,30 @@ fun HomeScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    val selectedImageUri by scannerViewModel.selectedImageUri.collectAsState()
+    val isAnalyzingImage by scannerViewModel.isAnalyzingImage.collectAsState()
+    val imageScanResults by scannerViewModel.imageScanResults.collectAsState()
+    val isVibrationEnabled by settingsViewModel.isVibrationEnabled.collectAsState()
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            scannerViewModel.analyzeImageUri(context, it, isVibrationEnabled)
+        }
+    }
+
+    if (selectedImageUri != null) {
+        ImageScanResultsDialog(
+            imageUri = selectedImageUri!!,
+            isAnalyzing = isAnalyzingImage,
+            results = imageScanResults,
+            onCopyClick = { entity -> scannerViewModel.copyToClipboard(context, entity) },
+            onPickAnother = { imagePickerLauncher.launch("image/*") },
+            onDismiss = { scannerViewModel.clearSelectedImage() }
+        )
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -142,7 +176,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Auto-detect phone numbers (+ required) & email addresses in real-time.",
+                    text = "Auto-detect phone numbers (+ required) & email addresses via live camera or attached images.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
@@ -151,22 +185,58 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                Button(
-                    onClick = onStartScannerClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EmeraldPrimary,
-                        contentColor = MaterialTheme.colorScheme.background
-                    )
+                // Dual Action Buttons: Live Camera & Attach Image
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "START SCANNER",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    Button(
+                        onClick = onStartScannerClick,
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EmeraldPrimary,
+                            contentColor = MaterialTheme.colorScheme.background
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "CAMERA",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { imagePickerLauncher.launch("image/*") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = EmeraldPrimary
+                        ),
+                        border = BorderStroke(1.5.dp, EmeraldPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "ATTACH",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
 

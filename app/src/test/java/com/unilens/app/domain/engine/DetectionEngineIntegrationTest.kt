@@ -70,4 +70,14 @@ class DetectionEngineIntegrationTest {
         assertEquals(1, emailOnly.size)
         assertEquals(EntityType.EMAIL, emailOnly[0].type)
     }
+
+    @Test
+    fun testStaticImageTextDetection() {
+        val attachedImageText = "Contact card:\nName: John Doe\nPhone: +62 812-3456-7890\nOffice: 0215551234\nEmail: john.doe@company.com"
+        val detected = engine.detectFromText(attachedImageText)
+
+        assertEquals(2, detected.size)
+        assertEquals("+6281234567890", detected.find { it.type == EntityType.PHONE }?.value)
+        assertEquals("john.doe@company.com", detected.find { it.type == EntityType.EMAIL }?.value)
+    }
 }

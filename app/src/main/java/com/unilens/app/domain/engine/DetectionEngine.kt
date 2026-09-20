@@ -76,6 +76,36 @@ class DetectionEngine(
         return stabilizer.update(rawFrameDetections.distinctBy { it.uniqueKey }, currentTimeMs)
     }
 
+    /**
+     * Processes static image ML Kit text directly without multi-frame temporal stabilization requirement.
+     */
+    fun processStaticMlKitText(mlKitText: Text): List<DetectedEntity> {
+        val results = mutableListOf<DetectedEntity>()
+
+        for (block in mlKitText.textBlocks) {
+            for (line in block.lines) {
+                val lineText = line.text
+                val lineBox = line.boundingBox
+
+                if (isPhoneDetectionEnabled) {
+                    results.addAll(phoneDetector.detect(lineText, lineBox))
+                }
+                if (isEmailDetectionEnabled) {
+                    results.addAll(emailDetector.detect(lineText, lineBox))
+                }
+            }
+        }
+
+        if (results.isEmpty()) {
+            val fullText = mlKitText.text
+            if (fullText.isNotBlank()) {
+                results.addAll(detectFromText(fullText, null))
+            }
+        }
+
+        return results.distinctBy { it.uniqueKey }
+    }
+
     fun reset() {
         stabilizer.clear()
     }

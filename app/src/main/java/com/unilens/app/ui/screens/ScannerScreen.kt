@@ -1,7 +1,10 @@
 package com.unilens.app.ui.screens
 
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -33,7 +36,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Phone
+import com.unilens.app.ui.components.ImageScanResultsDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -88,9 +93,21 @@ fun ScannerScreen(
     val isTorchOn by scannerViewModel.isTorchOn.collectAsState()
     val toastMessage by scannerViewModel.toastMessage.collectAsState()
 
+    val selectedImageUri by scannerViewModel.selectedImageUri.collectAsState()
+    val isAnalyzingImage by scannerViewModel.isAnalyzingImage.collectAsState()
+    val imageScanResults by scannerViewModel.imageScanResults.collectAsState()
+
     val isPhoneEnabled by settingsViewModel.isPhoneEnabled.collectAsState()
     val isEmailEnabled by settingsViewModel.isEmailEnabled.collectAsState()
     val isVibrationEnabled by settingsViewModel.isVibrationEnabled.collectAsState()
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            scannerViewModel.analyzeImageUri(context, it, isVibrationEnabled)
+        }
+    }
 
     var cameraControlRef by remember { mutableStateOf<Camera?>(null) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -171,6 +188,18 @@ fun ScannerScreen(
             modifier = Modifier.fillMaxSize()
         )
 
+        // Image Scan Results Dialog (if image attached)
+        if (selectedImageUri != null) {
+            ImageScanResultsDialog(
+                imageUri = selectedImageUri!!,
+                isAnalyzing = isAnalyzingImage,
+                results = imageScanResults,
+                onCopyClick = { entity -> scannerViewModel.copyToClipboard(context, entity) },
+                onPickAnother = { imagePickerLauncher.launch("image/*") },
+                onDismiss = { scannerViewModel.clearSelectedImage() }
+            )
+        }
+
         // 3. Top Action Controls Bar
         Row(
             modifier = Modifier
@@ -206,17 +235,31 @@ fun ScannerScreen(
                 )
             }
 
-            // Torch Toggle
-            IconButton(
-                onClick = { scannerViewModel.toggleTorch(cameraControlRef?.cameraControl) },
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-            ) {
-                Icon(
-                    imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                    contentDescription = "Torch",
-                    tint = if (isTorchOn) EmeraldPrimary else Color.White
-                )
+            // Right Action Controls: Attach Image & Torch
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = "Attach Image",
+                        tint = Color.White
+                    )
+                }
+
+                IconButton(
+                    onClick = { scannerViewModel.toggleTorch(cameraControlRef?.cameraControl) },
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                        contentDescription = "Torch",
+                        tint = if (isTorchOn) EmeraldPrimary else Color.White
+                    )
+                }
             }
         }
 

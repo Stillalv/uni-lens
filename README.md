@@ -16,6 +16,9 @@ UniLens is an offline-first Android Native application engineered to detect inte
 - ✉️ **Strict Email Detection**:
   - Validates `name@domain.extension` standard (rejects `admin@`, `@gmail.com`, `admin@gmail`).
   - Bounded candidate cleaning with trailing sentence punctuation stripping.
+- 🖼️ **Attach Image & Gallery OCR**:
+  - Pick any image from Gallery or file picker to scan and extract phone and email without turning on the camera.
+  - Zero storage permission required (uses Android Photo Picker / SAF).
 - 🫧 **Floating Widget Bubble**:
   - Movable bubble overlay (`TYPE_APPLICATION_OVERLAY` for API 26+, `TYPE_PHONE` fallback for API 23-25).
   - **Decoupled Architecture**: Camera is 100% idle while the bubble sits on screen. Zero camera leaks or unnecessary background battery drain.

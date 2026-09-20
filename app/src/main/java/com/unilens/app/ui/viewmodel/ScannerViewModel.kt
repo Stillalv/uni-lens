@@ -3,12 +3,16 @@ package com.unilens.app.ui.viewmodel
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.camera.core.CameraControl
 import androidx.lifecycle.ViewModel
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.unilens.app.data.model.DetectedEntity
 import com.unilens.app.domain.engine.DetectionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +28,15 @@ data class FrameMetrics(
 class ScannerViewModel(
     val detectionEngine: DetectionEngine = DetectionEngine()
 ) : ViewModel() {
+
+    private val _selectedImageUri = MutableStateFlow<Uri?>(null)
+    val selectedImageUri: StateFlow<Uri?> = _selectedImageUri.asStateFlow()
+
+    private val _isAnalyzingImage = MutableStateFlow(false)
+    val isAnalyzingImage: StateFlow<Boolean> = _isAnalyzingImage.asStateFlow()
+
+    private val _imageScanResults = MutableStateFlow<List<DetectedEntity>>(emptyList())
+    val imageScanResults: StateFlow<List<DetectedEntity>> = _imageScanResults.asStateFlow()
 
     private val _detectedEntities = MutableStateFlow<List<DetectedEntity>>(emptyList())
     val detectedEntities: StateFlow<List<DetectedEntity>> = _detectedEntities.asStateFlow()
@@ -65,6 +78,42 @@ class ScannerViewModel(
         val newState = !_isTorchOn.value
         _isTorchOn.value = newState
         cameraControl?.enableTorch(newState)
+    }
+
+    fun analyzeImageUri(context: Context, uri: Uri, vibrationEnabled: Boolean) {
+        _selectedImageUri.value = uri
+        _isAnalyzingImage.value = true
+        _imageScanResults.value = emptyList()
+
+        try {
+            val inputImage = InputImage.fromFilePath(context, uri)
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer.process(inputImage)
+                .addOnSuccessListener { visionText ->
+                    val results = detectionEngine.processStaticMlKitText(visionText)
+                    _imageScanResults.value = results
+                    _isAnalyzingImage.value = false
+                    if (results.isNotEmpty() && vibrationEnabled) {
+                        triggerShortVibration(context)
+                    }
+                    if (results.isEmpty()) {
+                        _toastMessage.value = "No phone or email found in selected image."
+                    }
+                }
+                .addOnFailureListener { e ->
+                    _isAnalyzingImage.value = false
+                    _toastMessage.value = "OCR analysis failed: ${e.localizedMessage}"
+                }
+        } catch (e: Exception) {
+            _isAnalyzingImage.value = false
+            _toastMessage.value = "Failed to load image: ${e.localizedMessage}"
+        }
+    }
+
+    fun clearSelectedImage() {
+        _selectedImageUri.value = null
+        _imageScanResults.value = emptyList()
+        _isAnalyzingImage.value = false
     }
 
     fun copyToClipboard(context: Context, entity: DetectedEntity) {

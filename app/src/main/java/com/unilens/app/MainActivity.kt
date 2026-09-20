@@ -28,6 +28,7 @@ enum class MainDestination {
 class MainActivity : ComponentActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModels()
+    private val scannerViewModel: com.unilens.app.ui.viewmodel.ScannerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +57,7 @@ class MainActivity : ComponentActivity() {
                     when (currentDestination) {
                         MainDestination.HOME -> {
                             HomeScreen(
+                                scannerViewModel = scannerViewModel,
                                 settingsViewModel = settingsViewModel,
                                 isFloatingEnabled = isFloatingEnabled,
                                 onStartScannerClick = {
